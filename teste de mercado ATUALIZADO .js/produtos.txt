@@ -1,0 +1,4 @@
+banana - 10.00
+abacate - 10.00
+cenoura - 10.00
+milho - 10.00

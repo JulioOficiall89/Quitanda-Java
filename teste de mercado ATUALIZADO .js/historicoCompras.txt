@@ -1,0 +1,12 @@
+2/8/2024 12:10, 20.00, dinheiro
+2 banana(s)
+6/8/2024 8:27, 10.00, dinheiro
+1 banana(s)
+6/8/2024 8:43, 10.00, xerecard
+1 banana(s)
+6/8/2024 8:46, 20.00, Xerecard - Prazo de pagamento
+2 banana(s)
+6/8/2024 9:05, 10.00, Xerecard - Prazo de pagamento
+1 banana(s)
+6/8/2024 9:21, 10.00, Dinheiro
+1 banana(s)
