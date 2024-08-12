@@ -222,7 +222,7 @@ function menuAdmin() {
                 totalVendasDia();
                 break;
             case '5':
-                menu();
+                menu(); // Voltar ao menu principal sem a opção de acesso administrativo
                 break;
             default:
                 console.log('Opção inválida.');
@@ -232,13 +232,13 @@ function menuAdmin() {
     });
 }
 
-function comprarProdutos() {
+function comprarProdutos(cliente) {
     let carrinho = [];
     exibirProdutos();
     function adicionarAoCarrinho() {
         rl.question('Escolha o número do produto (ou digite "fim" para finalizar): ', (resposta) => {
             if (resposta.toLowerCase() === 'fim') {
-                selecionarPagamento(carrinho);
+                selecionarPagamento(carrinho, cliente);
             } else {
                 const indice = parseInt(resposta) - 1;
                 const produto = produtos[indice];
@@ -266,7 +266,7 @@ function comprarProdutos() {
     adicionarAoCarrinho();
 }
 
-function selecionarPagamento(carrinho) {
+function selecionarPagamento(carrinho, cliente) {
     console.log('\nFormas de Pagamento:');
     console.log('1. Dinheiro');
     console.log('2. Cartão de Crédito');
@@ -277,38 +277,38 @@ function selecionarPagamento(carrinho) {
     rl.question('Escolha uma forma de pagamento: ', (escolha) => {
         switch (escolha) {
             case '1':
-                finalizarCompra(null, carrinho, 'Dinheiro');
+                finalizarCompra(cliente, carrinho, 'Dinheiro');
                 break;
             case '2':
-                finalizarCompra(null, carrinho, 'Cartão de Crédito');
+                finalizarCompra(cliente, carrinho, 'Cartão de Crédito');
                 break;
             case '3':
-                finalizarCompra(null, carrinho, 'Cartão de Débito');
+                finalizarCompra(cliente, carrinho, 'Cartão de Débito');
                 break;
             case '4':
                 rl.question('Digite o dia do pagamento (DD/MM/AAAA): ', (dia) => {
                     rl.question('Digite a hora do pagamento (HH:MM): ', (hora) => {
                         console.log('Endereço: Rua Dr. Creme, 666, Xique-Xique BA.');
                         console.log('Referência: Na Frente do Cemitério de Xique-Xique.');
-                        finalizarCompra(null, carrinho, `Xerecard - ${dia} ${hora}`);
+                        finalizarCompra(cliente, carrinho, `Xerecard - ${dia} ${hora}`);
                     });
                 });
                 break;
             case '5':
                 rl.question('Digite o código do boleto: ', (codigo) => {
                     console.log('O pagamento deve ser realizado no prazo de uma semana!');
-                    finalizarCompra(null, carrinho, `Boleto Bancário - Código: ${codigo}`);
+                    finalizarCompra(cliente, carrinho, `Boleto Bancário - Código: ${codigo}`);
                 });
                 break;
             case '6':
                 console.log('O pagamento deve ser realizado no prazo de uma semana!');
                 rl.question('Qual o dia de pagamento? (DD/MM/AAAA): ', (dia) => {
-                    finalizarCompra(null, carrinho, `Fiado - Dia de Pagamento: ${dia}`);
+                    finalizarCompra(cliente, carrinho, `Fiado - Dia de Pagamento: ${dia}`);
                 });
                 break;
             default:
                 console.log('Forma de pagamento inválida. Tente novamente.');
-                selecionarPagamento(carrinho);
+                selecionarPagamento(carrinho, cliente);
                 break;
         }
     });
@@ -351,29 +351,35 @@ function finalizarCompra(cliente, carrinho, tipoPagamento) {
             }
         });
     } else {
-        menu();
+        menu(cliente);
     }
 }
 
-function menu() {
+function menu(cliente) {
     console.log('\nMenu:');
     console.log('1. Comprar Produtos');
-    console.log('2. Acesso Administrativo (se você for o ADM)');
-    console.log('3. Sair');
+    if (!cliente) {
+        console.log('3. Sair');
+    }
     rl.question('Escolha uma opção: ', (opcao) => {
         switch (opcao) {
             case '1':
-                comprarProdutos();
+                comprarProdutos(cliente);
                 break;
             case '2':
-                autenticarAdmin(menuAdmin);
+                if (!cliente) {
+                    autenticarAdmin(menuAdmin);
+                } else {
+                    console.log('Você já está logado como cliente.');
+                    menu(cliente);
+                }
                 break;
             case '3':
                 rl.close();
                 break;
             default:
                 console.log('Opção inválida.');
-                menu();
+                menu(cliente);
                 break;
         }
     });
@@ -382,7 +388,7 @@ function menu() {
 function iniciarSistema() {
     perguntarSimNao('Já possui cadastro? (s/n): ', (resposta) => {
         if (resposta === 's') {
-            loginCliente(() => menu());
+            loginCliente(cliente => menu(cliente));
         } else {
             perguntarSimNao('Deseja fazer o cadastro agora? (s/n): ', (respostaCadastro) => {
                 if (respostaCadastro === 's') {
@@ -399,4 +405,3 @@ function iniciarSistema() {
 }
 
 carregarDados();
-iniciarSistema();
