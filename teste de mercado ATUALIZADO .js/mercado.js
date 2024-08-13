@@ -26,9 +26,7 @@ function carregarDados() {
             });
         }
         if (fs.existsSync('historicoCompras.txt')) {
-            historicoCompras = fs.readFileSync('historicoCompras.txt', 'utf8').trim().split('\n').map(line => {
-                return line;
-            });
+            historicoCompras = fs.readFileSync('historicoCompras.txt', 'utf8').trim().split('\n');
         }
         if (fs.existsSync('admin.txt')) {
             const [nome, email, senha, cpf] = fs.readFileSync('admin.txt', 'utf8').trim().split(' - ');
@@ -61,6 +59,21 @@ function perguntarSimNao(pergunta, callback) {
     });
 }
 
+function loadingAnimation(callback) {
+    const frames = ['.', '..', '...', '....'];
+    let frameIndex = 0;
+    const interval = setInterval(() => {
+        process.stdout.write(`Loading${frames[frameIndex]}   \r`);
+        frameIndex = (frameIndex + 1) % frames.length;
+    }, 500); 
+
+    setTimeout(() => {
+        clearInterval(interval);
+        process.stdout.write('Loading complete!            \r');
+        callback();
+    }, 4000); 
+}
+
 function autenticarAdmin(callback) {
     rl.question('Digite o e-mail do administrador: ', (email) => {
         if (email === admin.email) {
@@ -72,17 +85,17 @@ function autenticarAdmin(callback) {
                             callback();
                         } else {
                             console.log('CPF incorreto.');
-                            menu();
+                            menu(cliente);
                         }
                     });
                 } else {
                     console.log('Senha incorreta.');
-                    menu();
+                    menu(cliente);
                 }
             });
         } else {
             console.log('E-mail incorreto.');
-            menu();
+            menu(cliente);
         }
     });
 }
@@ -95,7 +108,7 @@ function cadastrarCliente() {
                     cadastros.push({ nome, email, senha, cpf });
                     salvarDados();
                     console.log('Cliente cadastrado com sucesso!');
-                    menu();
+                    menu(null);
                 });
             });
         });
@@ -111,7 +124,13 @@ function loginCliente(callback) {
                 callback(cliente);
             } else {
                 console.log('Email ou senha incorretos.');
-                menu();
+                perguntarSimNao('Deseja tentar o login novamente? (s/n): ', (resposta) => {
+                    if (resposta === 's') {
+                        loginCliente(callback);
+                    } else {
+                        menu(null); 
+                    }
+                });
             }
         });
     });
@@ -129,7 +148,7 @@ function adicionarProduto() {
             produtos.push({ nome, preco: precoNumerico });
             salvarDados();
             console.log('Produto adicionado com sucesso!');
-            menuAdmin();
+            menuAdmin(); 
         });
     });
 }
@@ -155,11 +174,11 @@ function adicionarPromocao() {
                 produto.preco = precoNumerico;
                 salvarDados();
                 console.log('Promoção aplicada com sucesso!');
-                menuAdmin();
+                menuAdmin(); 
             });
         } else {
             console.log('Produto não encontrado.');
-            menuAdmin();
+            menuAdmin(); 
         }
     });
 }
@@ -178,11 +197,11 @@ function mudarPrecoProduto() {
                 produto.preco = precoNumerico;
                 salvarDados();
                 console.log('Preço alterado com sucesso!');
-                menuAdmin();
+                menuAdmin(); 
             });
         } else {
             console.log('Produto não encontrado.');
-            menuAdmin();
+            menuAdmin(); 
         }
     });
 }
@@ -197,7 +216,7 @@ function totalVendasDia() {
         return acc;
     }, 0);
     console.log(`Total de vendas do dia (${hoje}): R$${total.toFixed(2)}`);
-    menuAdmin();
+    menuAdmin(); 
 }
 
 function menuAdmin() {
@@ -222,7 +241,7 @@ function menuAdmin() {
                 totalVendasDia();
                 break;
             case '5':
-                menu(); // Voltar ao menu principal sem a opção de acesso administrativo
+                menu(); 
                 break;
             default:
                 console.log('Opção inválida.');
@@ -232,34 +251,90 @@ function menuAdmin() {
     });
 }
 
+function menu(cliente) {
+    if (cliente && cliente.email === admin.email) {
+        console.log('\nMenu Administrativo:');
+        console.log('1. Adicionar Produto');
+        console.log('2. Adicionar Promoção');
+        console.log('3. Mudar Preço do Item');
+        console.log('4. Total de Vendas do Dia');
+        console.log('5. Comprar Produtos');
+        console.log('6. Sair');
+        rl.question('Escolha uma opção: ', (opcao) => {
+            switch (opcao) {
+                case '1':
+                    adicionarProduto();
+                    break;
+                case '2':
+                    adicionarPromocao();
+                    break;
+                case '3':
+                    mudarPrecoProduto();
+                    break;
+                case '4':
+                    totalVendasDia();
+                    break;
+                case '5':
+                    comprarProdutos(cliente);
+                    break;
+                case '6':
+                    rl.close();
+                    break;
+                default:
+                    console.log('Opção inválida.');
+                    menu(cliente);
+                    break;
+            }
+        });
+    } else {
+        console.log('\nMenu:');
+        console.log('1. Comprar Produtos');
+        console.log('2. Sair');
+        rl.question('Escolha uma opção: ', (opcao) => {
+            switch (opcao) {
+                case '1':
+                    comprarProdutos(cliente);
+                    break;
+                case '2':
+                    rl.close();
+                    break;
+                default:
+                    console.log('Opção inválida.');
+                    menu(cliente);
+                    break;
+            }
+        });
+    }
+}
+
 function comprarProdutos(cliente) {
-    let carrinho = [];
     exibirProdutos();
+    const carrinho = [];
     function adicionarAoCarrinho() {
-        rl.question('Escolha o número do produto (ou digite "fim" para finalizar): ', (resposta) => {
-            if (resposta.toLowerCase() === 'fim') {
+        rl.question('Escolha um produto (ou digite "sair" para finalizar): ', (opcao) => {
+            if (opcao.toLowerCase() === 'sair') {
                 selecionarPagamento(carrinho, cliente);
-            } else {
-                const indice = parseInt(resposta) - 1;
-                const produto = produtos[indice];
-                if (produto) {
-                    rl.question('Quantidade: ', (quantidade) => {
-                        const qtdNumerica = parseInt(quantidade);
-                        if (isNaN(qtdNumerica) || qtdNumerica <= 0) {
-                            console.log('Quantidade inválida. Tente novamente.');
-                            adicionarAoCarrinho();
-                            return;
-                        }
-                        for (let i = 0; i < qtdNumerica; i++) {
-                            carrinho.push(produto);
-                        }
-                        console.log(`${qtdNumerica} ${produto.nome}(s) adicionado(s) ao carrinho.`);
+                return;
+            }
+            const indice = parseInt(opcao) - 1;
+            const produto = produtos[indice];
+            if (produto) {
+                rl.question('Quantidade: ', (quantidade) => {
+                    const qtdNumerica = parseInt(quantidade);
+                    if (isNaN(qtdNumerica) || qtdNumerica <= 0) {
+                        console.log('Quantidade invalida. Favor tente denovo.');
                         adicionarAoCarrinho();
-                    });
-                } else {
-                    console.log('Produto não encontrado.');
+                        return;
+                    }
+                    for (let i = 0; i < qtdNumerica; i++) {
+                        carrinho.push(produto);
+                    }
+                    console.log(`${qtdNumerica} ${produto.nome}(s) adicionado(s) ao carrinho.`);
                     adicionarAoCarrinho();
-                }
+                });
+            } else {
+                console.log('Produto não encontrado.');
+                adicionarAoCarrinho();
             }
         });
     }
@@ -307,7 +382,7 @@ function selecionarPagamento(carrinho, cliente) {
                 });
                 break;
             default:
-                console.log('Forma de pagamento inválida. Tente novamente.');
+                console.log('Forma de pagamento invalida. Favor tente denovo.');
                 selecionarPagamento(carrinho, cliente);
                 break;
         }
@@ -342,11 +417,11 @@ function finalizarCompra(cliente, carrinho, tipoPagamento) {
     console.log(`Produtos: ${produtosComprados}`);
 
     if (!cliente) {
-        perguntarSimNao('Deseja fazer o cadastro agora? (s/n): ', (resposta) => {
+        perguntarSimNao('voce eseja fazer o cadastro agora? (s/n): ', (resposta) => {
             if (resposta === 's') {
                 cadastrarCliente();
             } else {
-                console.log('Obrigado pela compra! Volte sempre.');
+                console.log('brigado pela compra! volte sempre.');
                 rl.close();
             }
         });
@@ -355,48 +430,28 @@ function finalizarCompra(cliente, carrinho, tipoPagamento) {
     }
 }
 
-function menu(cliente) {
-    console.log('\nMenu:');
-    console.log('1. Comprar Produtos');
-    if (!cliente) {
-        console.log('3. Sair');
-    }
-    rl.question('Escolha uma opção: ', (opcao) => {
-        switch (opcao) {
-            case '1':
-                comprarProdutos(cliente);
-                break;
-            case '2':
-                if (!cliente) {
-                    autenticarAdmin(menuAdmin);
-                } else {
-                    console.log('Você já está logado como cliente.');
-                    menu(cliente);
-                }
-                break;
-            case '3':
-                rl.close();
-                break;
-            default:
-                console.log('Opção inválida.');
-                menu(cliente);
-                break;
-        }
-    });
-}
-
 function iniciarSistema() {
-    perguntarSimNao('Já possui cadastro? (s/n): ', (resposta) => {
+    perguntarSimNao('ja possui cadastro? (s/n): ', (resposta) => {
         if (resposta === 's') {
-            loginCliente(cliente => menu(cliente));
+            loadingAnimation(() => {
+                loginCliente(cliente => {
+                    if (cliente.email === admin.email) {
+                        autenticarAdmin(() => menu(cliente));
+                    } else {
+                        menu(cliente);
+                    }
+                });
+            });
         } else {
-            perguntarSimNao('Deseja fazer o cadastro agora? (s/n): ', (respostaCadastro) => {
+            perguntarSimNao('deseja fazer o cadastro? (s/n): ', (respostaCadastro) => {
                 if (respostaCadastro === 's') {
                     cadastrarCliente();
                 } else {
-                    console.log('Bem-vindo ao Mercado! Faça suas compras.');
-                    rl.question('Pressione Enter para continuar...', () => {
-                        menu();
+                    console.log('bem- vindo ah quitanda!');
+                    rl.question('pressione Enter para continuar...', () => {
+                        loadingAnimation(() => {
+                            menu(null);
+                        });
                     });
                 }
             });
@@ -405,3 +460,4 @@ function iniciarSistema() {
 }
 
 carregarDados();
+iniciarSistema();
