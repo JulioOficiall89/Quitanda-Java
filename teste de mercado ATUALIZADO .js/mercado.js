@@ -9,7 +9,10 @@ const rl = readline.createInterface({
 let produtos = [];
 let cadastros = [];
 let historicoCompras = [];
-let admin = {};
+const admin = { nome: 'Jurandir', email: 'Jurandir@jurandir', senha: 'radiohead', cpf: '11921045600' };
+
+const MAX_NOME_LENGTH = 50;
+const MAX_SENHA_LENGTH = 20;
 
 function carregarDados() {
     try {
@@ -27,10 +30,6 @@ function carregarDados() {
         }
         if (fs.existsSync('historicoCompras.txt')) {
             historicoCompras = fs.readFileSync('historicoCompras.txt', 'utf8').trim().split('\n');
-        }
-        if (fs.existsSync('admin.txt')) {
-            const [nome, email, senha, cpf] = fs.readFileSync('admin.txt', 'utf8').trim().split(' - ');
-            admin = { nome, email, senha, cpf };
         }
     } catch (error) {
         console.error('Erro ao carregar dados:', error);
@@ -65,13 +64,13 @@ function loadingAnimation(callback) {
     const interval = setInterval(() => {
         process.stdout.write(`Loading${frames[frameIndex]}   \r`);
         frameIndex = (frameIndex + 1) % frames.length;
-    }, 500); 
+    }, 500);
 
     setTimeout(() => {
         clearInterval(interval);
         process.stdout.write('Loading complete!            \r');
         callback();
-    }, 4000); 
+    }, 4000);
 }
 
 function autenticarAdmin(callback) {
@@ -81,30 +80,74 @@ function autenticarAdmin(callback) {
                 if (senha === admin.senha) {
                     rl.question('Digite o CPF: ', (cpf) => {
                         if (cpf === admin.cpf) {
-                            console.log('Autenticação bem-sucedida.');
+                            console.log('Bem-vindo, Jurandir!');
                             callback();
                         } else {
                             console.log('CPF incorreto.');
-                            menu(cliente);
+                            menu(null);
                         }
                     });
                 } else {
                     console.log('Senha incorreta.');
-                    menu(cliente);
+                    menu(null);
                 }
             });
         } else {
             console.log('E-mail incorreto.');
-            menu(cliente);
+            menu(null);
+        }
+    });
+}
+
+function validarEmail(callback) {
+    rl.question('Email: ', (email) => {
+        if (email.includes('@')) {
+            callback(email);
+        } else {
+            console.log('O e-mail deve conter um "@"');
+            validarEmail(callback);
+        }
+    });
+}
+
+function validarCPF(callback) {
+    rl.question('CPF (somente números): ', (cpf) => {
+        if (/^\d{11}$/.test(cpf)) {
+            callback(cpf);
+        } else {
+            console.log('O CPF deve conter exatamente 11 números.');
+            validarCPF(callback);
+        }
+    });
+}
+
+function validarNome(callback) {
+    rl.question('Nome: ', (nome) => {
+        if (nome.length > MAX_NOME_LENGTH) {
+            console.log(`O nome deve ter no máximo ${MAX_NOME_LENGTH} caracteres.`);
+            validarNome(callback);
+        } else {
+            callback(nome);
+        }
+    });
+}
+
+function validarSenha(callback) {
+    rl.question('Senha: ', (senha) => {
+        if (senha.length > MAX_SENHA_LENGTH) {
+            console.log(`A senha deve ter no máximo ${MAX_SENHA_LENGTH} caracteres.`);
+            validarSenha(callback);
+        } else {
+            callback(senha);
         }
     });
 }
 
 function cadastrarCliente() {
-    rl.question('Nome: ', (nome) => {
-        rl.question('Email: ', (email) => {
-            rl.question('Senha: ', (senha) => {
-                rl.question('CPF (somente números): ', (cpf) => {
+    validarNome((nome) => {
+        validarEmail((email) => {
+            validarSenha((senha) => {
+                validarCPF((cpf) => {
                     cadastros.push({ nome, email, senha, cpf });
                     salvarDados();
                     console.log('Cliente cadastrado com sucesso!');
@@ -121,14 +164,18 @@ function loginCliente(callback) {
             const cliente = cadastros.find(c => c.email === email && c.senha === senha);
             if (cliente) {
                 console.log(`Bem-vindo, ${cliente.nome}!`);
-                callback(cliente);
+                if (email === admin.email) {
+                    autenticarAdmin(() => menuAdmin());
+                } else {
+                    callback(cliente);
+                }
             } else {
                 console.log('Email ou senha incorretos.');
                 perguntarSimNao('Deseja tentar o login novamente? (s/n): ', (resposta) => {
                     if (resposta === 's') {
                         loginCliente(callback);
                     } else {
-                        menu(null); 
+                        menu(null);
                     }
                 });
             }
@@ -148,7 +195,7 @@ function adicionarProduto() {
             produtos.push({ nome, preco: precoNumerico });
             salvarDados();
             console.log('Produto adicionado com sucesso!');
-            menuAdmin(); 
+            menuAdmin();
         });
     });
 }
@@ -174,11 +221,11 @@ function adicionarPromocao() {
                 produto.preco = precoNumerico;
                 salvarDados();
                 console.log('Promoção aplicada com sucesso!');
-                menuAdmin(); 
+                menuAdmin();
             });
         } else {
             console.log('Produto não encontrado.');
-            menuAdmin(); 
+            menuAdmin();
         }
     });
 }
@@ -197,11 +244,11 @@ function mudarPrecoProduto() {
                 produto.preco = precoNumerico;
                 salvarDados();
                 console.log('Preço alterado com sucesso!');
-                menuAdmin(); 
+                menuAdmin();
             });
         } else {
             console.log('Produto não encontrado.');
-            menuAdmin(); 
+            menuAdmin();
         }
     });
 }
@@ -216,7 +263,7 @@ function totalVendasDia() {
         return acc;
     }, 0);
     console.log(`Total de vendas do dia (${hoje}): R$${total.toFixed(2)}`);
-    menuAdmin(); 
+    menuAdmin();
 }
 
 function menuAdmin() {
@@ -241,7 +288,7 @@ function menuAdmin() {
                 totalVendasDia();
                 break;
             case '5':
-                menu(); 
+                menu(null);
                 break;
             default:
                 console.log('Opção inválida.');
@@ -252,59 +299,23 @@ function menuAdmin() {
 }
 
 function menu(cliente) {
-    if (cliente && cliente.email === admin.email) {
-        console.log('\nMenu Administrativo:');
-        console.log('1. Adicionar Produto');
-        console.log('2. Adicionar Promoção');
-        console.log('3. Mudar Preço do Item');
-        console.log('4. Total de Vendas do Dia');
-        console.log('5. Comprar Produtos');
-        console.log('6. Sair');
-        rl.question('Escolha uma opção: ', (opcao) => {
-            switch (opcao) {
-                case '1':
-                    adicionarProduto();
-                    break;
-                case '2':
-                    adicionarPromocao();
-                    break;
-                case '3':
-                    mudarPrecoProduto();
-                    break;
-                case '4':
-                    totalVendasDia();
-                    break;
-                case '5':
-                    comprarProdutos(cliente);
-                    break;
-                case '6':
-                    rl.close();
-                    break;
-                default:
-                    console.log('Opção inválida.');
-                    menu(cliente);
-                    break;
-            }
-        });
-    } else {
-        console.log('\nMenu:');
-        console.log('1. Comprar Produtos');
-        console.log('2. Sair');
-        rl.question('Escolha uma opção: ', (opcao) => {
-            switch (opcao) {
-                case '1':
-                    comprarProdutos(cliente);
-                    break;
-                case '2':
-                    rl.close();
-                    break;
-                default:
-                    console.log('Opção inválida.');
-                    menu(cliente);
-                    break;
-            }
-        });
-    }
+    console.log('\nMenu:');
+    console.log('1. Comprar Produtos');
+    console.log('2. Sair');
+    rl.question('Escolha uma opção: ', (opcao) => {
+        switch (opcao) {
+            case '1':
+                comprarProdutos(cliente);
+                break;
+            case '2':
+                rl.close();
+                break;
+            default:
+                console.log('Opção inválida.');
+                menu(cliente);
+                break;
+        }
+    });
 }
 
 function comprarProdutos(cliente) {
@@ -322,7 +333,7 @@ function comprarProdutos(cliente) {
                 rl.question('Quantidade: ', (quantidade) => {
                     const qtdNumerica = parseInt(quantidade);
                     if (isNaN(qtdNumerica) || qtdNumerica <= 0) {
-                        console.log('Quantidade invalida. Favor tente denovo.');
+                        console.log('Quantidade inválida. Tente novamente.');
                         adicionarAoCarrinho();
                         return;
                     }
@@ -382,7 +393,7 @@ function selecionarPagamento(carrinho, cliente) {
                 });
                 break;
             default:
-                console.log('Forma de pagamento invalida. Favor tente denovo.');
+                console.log('Forma de pagamento inválida. Favor tente novamente.');
                 selecionarPagamento(carrinho, cliente);
                 break;
         }
@@ -417,42 +428,32 @@ function finalizarCompra(cliente, carrinho, tipoPagamento) {
     console.log(`Produtos: ${produtosComprados}`);
 
     if (!cliente) {
-        perguntarSimNao('voce eseja fazer o cadastro agora? (s/n): ', (resposta) => {
-            if (resposta === 's') {
-                cadastrarCliente();
-            } else {
-                console.log('brigado pela compra! volte sempre.');
-                rl.close();
-            }
-        });
+        console.log('Agradecemos pela compra, volte sempre!');
+        rl.close();
     } else {
         menu(cliente);
     }
 }
 
 function iniciarSistema() {
-    perguntarSimNao('ja possui cadastro? (s/n): ', (resposta) => {
+    perguntarSimNao('Já possui cadastro? (s/n): ', (resposta) => {
         if (resposta === 's') {
             loadingAnimation(() => {
                 loginCliente(cliente => {
                     if (cliente.email === admin.email) {
-                        autenticarAdmin(() => menu(cliente));
+                        autenticarAdmin(menuAdmin);
                     } else {
                         menu(cliente);
                     }
                 });
             });
         } else {
-            perguntarSimNao('deseja fazer o cadastro? (s/n): ', (respostaCadastro) => {
+            console.log('Bem-vindo à quitanda!');
+            perguntarSimNao('Deseja fazer o cadastro? (s/n): ', (respostaCadastro) => {
                 if (respostaCadastro === 's') {
                     cadastrarCliente();
                 } else {
-                    console.log('bem- vindo ah quitanda!');
-                    rl.question('pressione Enter para continuar...', () => {
-                        loadingAnimation(() => {
-                            menu(null);
-                        });
-                    });
+                    rl.close();
                 }
             });
         }
