@@ -100,11 +100,12 @@ function autenticarAdmin(callback) {
 }
 
 function validarEmail(callback) {
-    rl.question('Email: ', (email) => {
-        if (email.includes('@')) {
+    rl.question('Email/hotmail: ', (email) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(email)) {
             callback(email);
         } else {
-            console.log('O e-mail deve conter um "@"');
+            console.log('O e-mail/hotemail deve ser um formato válido (exemplo: exemplo@dominio.com).');
             validarEmail(callback);
         }
     });
