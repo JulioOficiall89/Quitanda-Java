@@ -11,61 +11,66 @@ let cadastros = [];
 let historicoCompras = [];
 const admin = { nome: 'Jurandir', email: 'Jurandir@jurandir', senha: 'radiohead', cpf: '11921045600' };
 
-const MAX_NOME_LENGTH = 50;
-const MAX_SENHA_LENGTH = 20;
-
 function carregarDados() {
-    try {
-        if (fs.existsSync('produtos.txt')) {
-            produtos = fs.readFileSync('produtos.txt', 'utf8').trim().split('\n').map(line => {
-                const [nome, preco] = line.split(' - ');
-                return { nome, preco: parseFloat(preco) };
-            });
+    const lerArquivo = (arquivo, transformador) => {
+        try {
+            if (fs.existsSync(arquivo)) {
+                return fs.readFileSync(arquivo, 'utf8').trim().split('\n').map(transformador);
+            }
+        } catch (error) {
+            console.error(`Erro ao ler o arquivo ${arquivo}: ${error.message}`);
         }
-        if (fs.existsSync('cadastros.txt')) {
-            cadastros = fs.readFileSync('cadastros.txt', 'utf8').trim().split('\n').map(line => {
-                const [nome, email, senha, cpf] = line.split(' - ');
-                return { nome, email, senha, cpf };
-            });
-        }
-        if (fs.existsSync('historicoCompras.txt')) {
-            historicoCompras = fs.readFileSync('historicoCompras.txt', 'utf8').trim().split('\n');
-        }
-    } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-    }
+        return [];
+    };
+
+    produtos = lerArquivo('produtos.txt', line => {
+        const [nome, preco] = line.split(' - ');
+        return { nome, preco: parseFloat(preco) };
+    });
+
+    cadastros = lerArquivo('cadastros.txt', line => {
+        const [nome, email, senha, cpf] = line.split(' - ');
+        return { nome, email, senha, cpf };
+    });
+
+    historicoCompras = lerArquivo('historicoCompras.txt', linha => linha);
 }
 
 function salvarDados() {
-    const produtosData = produtos.map(produto => `${produto.nome} - ${produto.preco.toFixed(2)}`).join('\n');
-    fs.writeFileSync('produtos.txt', produtosData);
+    const salvarArquivo = (arquivo, dados, transformador) => {
+        try {
+            fs.writeFileSync(arquivo, dados.map(transformador).join('\n'));
+        } catch (error) {
+            console.error(`Erro ao salvar o arquivo ${arquivo}: ${error.message}`);
+        }
+    };
 
-    const cadastrosData = cadastros.map(cadastro => `${cadastro.nome} - ${cadastro.email} - ${cadastro.senha} - ${cadastro.cpf}`).join('\n');
-    fs.writeFileSync('cadastros.txt', cadastrosData);
+    salvarArquivo('produtos.txt', produtos, p => `${p.nome} - ${p.preco.toFixed(2)}`);
+    salvarArquivo('cadastros.txt', cadastros, c => `${c.nome} - ${c.email} - ${c.senha} - ${c.cpf}`);
+    salvarArquivo('historicoCompras.txt', historicoCompras, h => h);
+}
 
-    const historicoData = historicoCompras.join('\n');
-    fs.writeFileSync('historicoCompras.txt', historicoData);
+function tratarErro(funcao) {
+    try {
+        funcao();
+    } catch (error) {
+        console.error(`Ocorreu um erro: ${error.message}`);
+        menu(null);
+    }
 }
 
 function perguntarSimNao(pergunta, callback) {
-    rl.question(pergunta, (resposta) => {
-        if (resposta.toLowerCase() === 's' || resposta.toLowerCase() === 'n') {
-            callback(resposta.toLowerCase());
-        } else {
-            console.log('Resposta inválida. Por favor, responda com "s" ou "n".');
-            perguntarSimNao(pergunta, callback);
-        }
+    rl.question(pergunta, resposta => {
+        resposta.toLowerCase() === 's' || resposta.toLowerCase() === 'n'
+            ? callback(resposta.toLowerCase())
+            : (console.log('Resposta inválida. Responda com "s" ou "n".'), perguntarSimNao(pergunta, callback));
     });
 }
 
 function loadingAnimation(callback) {
     const frames = ['.', '..', '...', '....'];
     let frameIndex = 0;
-    const interval = setInterval(() => {
-        process.stdout.write(`Loading${frames[frameIndex]}   \r`);
-        frameIndex = (frameIndex + 1) % frames.length;
-    }, 500);
-
+    const interval = setInterval(() => process.stdout.write(`Loading${frames[frameIndex]}   \r`), 500);
     setTimeout(() => {
         clearInterval(interval);
         process.stdout.write('Loading complete!            \r');
@@ -74,85 +79,36 @@ function loadingAnimation(callback) {
 }
 
 function autenticarAdmin(callback) {
-    rl.question('Digite o e-mail do administrador: ', (email) => {
-        if (email === admin.email) {
-            rl.question('Digite a senha: ', (senha) => {
-                if (senha === admin.senha) {
-                    rl.question('Digite o CPF: ', (cpf) => {
-                        if (cpf === admin.cpf) {
-                            console.log('Bem-vindo, Jurandir!');
-                            callback();
-                        } else {
-                            console.log('CPF incorreto.');
-                            menu(null);
-                        }
-                    });
-                } else {
-                    console.log('Senha incorreta.');
-                    menu(null);
-                }
+    rl.question('Digite o e-mail do administrador: ', email => {
+        if (email !== admin.email) return console.log('E-mail incorreto.'), menu(null);
+        rl.question('Digite a senha: ', senha => {
+            if (senha !== admin.senha) return console.log('Senha incorreta.'), menu(null);
+            rl.question('Digite o CPF: ', cpf => {
+                if (cpf !== admin.cpf) return console.log('CPF incorreto.'), menu(null);
+                console.log('Bem-vindo, Jurandir!');
+                callback();
             });
-        } else {
-            console.log('E-mail incorreto.');
-            menu(null);
-        }
+        });
     });
 }
 
-function validarEmail(callback) {
-    rl.question('Email/hotmail: ', (email) => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (emailRegex.test(email)) {
-            callback(email);
-        } else {
-            console.log('O e-mail/hotemail deve ser um formato válido (exemplo: exemplo@dominio.com).');
-            validarEmail(callback);
-        }
-    });
-}
-
-function validarCPF(callback) {
-    rl.question('CPF (somente números): ', (cpf) => {
-        if (/^\d{11}$/.test(cpf)) {
-            callback(cpf);
-        } else {
-            console.log('O CPF deve conter exatamente 11 números.');
-            validarCPF(callback);
-        }
-    });
-}
-
-function validarNome(callback) {
-    rl.question('Nome: ', (nome) => {
-        if (nome.length > MAX_NOME_LENGTH) {
-            console.log(`O nome deve ter no máximo ${MAX_NOME_LENGTH} caracteres.`);
-            validarNome(callback);
-        } else {
-            callback(nome);
-        }
-    });
-}
-
-function validarSenha(callback) {
-    rl.question('Senha: ', (senha) => {
-        if (senha.length > MAX_SENHA_LENGTH) {
-            console.log(`A senha deve ter no máximo ${MAX_SENHA_LENGTH} caracteres.`);
-            validarSenha(callback);
-        } else {
-            callback(senha);
-        }
+function validarEntrada(mensagem, regex, callback) {
+    rl.question(mensagem, entrada => {
+        regex.test(entrada) ? callback(entrada) : (console.log('Entrada inválida.'), validarEntrada(mensagem, regex, callback));
     });
 }
 
 function cadastrarCliente() {
-    validarNome((nome) => {
-        validarEmail((email) => {
-            validarSenha((senha) => {
-                validarCPF((cpf) => {
-                    cadastros.push({ nome, email, senha, cpf });
-                    salvarDados();
-                    console.log('Cliente cadastrado com sucesso!');
-                    menu(null);
+    tratarErro(() => {
+        validarEntrada('Nome (máx 50 caracteres): ', /^.{1,50}$/, nome => {
+            validarEntrada('Email/hotmail: ', /^[^\s@]+@[^\s@]+\.[^\s@]+$/, email => {
+                validarEntrada('Senha (máx 20 caracteres): ', /^.{1,20}$/, senha => {
+                    validarEntrada('CPF (somente números, 11 dígitos): ', /^\d{11}$/, cpf => {
+                        cadastros.push({ nome, email, senha, cpf });
+                        salvarDados();
+                        console.log('Cliente cadastrado com sucesso!');
+                        menu(null);
+                    });
                 });
             });
         });
@@ -160,304 +116,215 @@ function cadastrarCliente() {
 }
 
 function loginCliente(callback) {
-    rl.question('Email: ', (email) => {
-        rl.question('Senha: ', (senha) => {
-            const cliente = cadastros.find(c => c.email === email && c.senha === senha);
-            if (cliente) {
-                console.log(`Bem-vindo, ${cliente.nome}!`);
-                if (email === admin.email) {
-                    autenticarAdmin(() => menuAdmin());
-                } else {
-                    callback(cliente);
-                }
-            } else {
-                console.log('Email ou senha incorretos.');
-                perguntarSimNao('Deseja tentar o login novamente? (s/n): ', (resposta) => {
-                    if (resposta === 's') {
-                        loginCliente(callback);
-                    } else {
-                        menu(null);
-                    }
-                });
-            }
+    tratarErro(() => {
+        rl.question('Email: ', email => {
+            rl.question('Senha: ', senha => {
+                const cliente = cadastros.find(c => c.email === email && c.senha === senha);
+                if (!cliente) return (console.log('Email ou senha incorretos.'), perguntarSimNao('Deseja tentar o login novamente? (s/n): ', resposta => resposta === 's' ? loginCliente(callback) : menu(null)));
+                cliente.email === admin.email ? autenticarAdmin(menuAdmin) : callback(cliente);
+            });
         });
     });
 }
 
 function adicionarProduto() {
-    rl.question('Nome do produto: ', (nome) => {
-        rl.question('Preço: ', (preco) => {
-            const precoNumerico = parseFloat(preco);
-            if (isNaN(precoNumerico)) {
-                console.log('Preço inválido. Tente novamente.');
-                adicionarProduto();
-                return;
-            }
-            produtos.push({ nome, preco: precoNumerico });
-            salvarDados();
-            console.log('Produto adicionado com sucesso!');
-            menuAdmin();
+    tratarErro(() => {
+        rl.question('Nome do produto: ', nome => {
+            rl.question('Preço: ', preco => {
+                const precoNumerico = parseFloat(preco);
+                isNaN(precoNumerico) ? (console.log('Preço inválido. Tente novamente.'), adicionarProduto()) : (produtos.push({ nome, preco: precoNumerico }), salvarDados(), console.log('Produto adicionado com sucesso!'), menuAdmin());
+            });
         });
+    });
+}
+
+function alterarPrecoProduto() {
+    tratarErro(() => {
+        rl.question('Nome do produto: ', nome => {
+            const produto = produtos.find(p => p.nome === nome);
+            if (!produto) return console.log('Produto não encontrado.'), menuAdmin();
+            rl.question('Novo preço: ', preco => {
+                const precoNumerico = parseFloat(preco);
+                isNaN(precoNumerico) ? (console.log('Preço inválido.'), alterarPrecoProduto()) : (produto.preco = precoNumerico, salvarDados(), console.log('Preço alterado com sucesso!'), menuAdmin());
+            });
+        });
+    });
+}
+
+function totalVendasDia() {
+    tratarErro(() => {
+        const hoje = new Date().toLocaleDateString('pt-BR');
+        const total = historicoCompras.reduce((acc, linha) => linha.startsWith(hoje) ? acc + parseFloat(linha.split(', ')[1]) : acc, 0);
+        console.log(`Total de vendas do dia (${hoje}): R$${total.toFixed(2)}`);
+        menuAdmin();
     });
 }
 
 function exibirProdutos() {
     console.log('Produtos disponíveis:');
-    produtos.forEach((produto, index) => {
-        console.log(`${index + 1}. ${produto.nome} - R$${produto.preco.toFixed(2)}`);
-    });
+    produtos.forEach((produto, index) => console.log(`${index + 1}. ${produto.nome} - R$${produto.preco.toFixed(2)}`));
 }
 
-function adicionarPromocao() {
-    rl.question('Nome do produto para adicionar promoção: ', (nome) => {
-        const produto = produtos.find(p => p.nome === nome);
-        if (produto) {
-            rl.question('Novo preço com promoção: ', (preco) => {
-                const precoNumerico = parseFloat(preco);
-                if (isNaN(precoNumerico)) {
-                    console.log('Preço inválido. Tente novamente.');
-                    adicionarPromocao();
+function catalogoProdutos() {
+    console.log('\nCatálogo de Produtos:');
+    exibirProdutos();
+    menu(null); // Volta ao menu principal após exibir o catálogo
+}
+
+function comprarProdutos(cliente) {
+    tratarErro(() => {
+        if (!cliente) return console.log('Cliente não autenticado.'), menu(null);
+        exibirProdutos();
+        const carrinho = [];
+        const adicionarAoCarrinho = () => {
+            rl.question('Escolha um produto (ou digite "sair" para finalizar): ', opcao => {
+                if (opcao.toLowerCase() === 'sair') {
+                    selecionarPagamento(carrinho, cliente);
                     return;
                 }
-                produto.preco = precoNumerico;
-                salvarDados();
-                console.log('Promoção aplicada com sucesso!');
-                menuAdmin();
+                const indice = parseInt(opcao) - 1;
+                const produto = produtos[indice];
+                if (!produto) return console.log('Produto não encontrado.'), adicionarAoCarrinho();
+                rl.question('Quantidade: ', quantidade => {
+                    const qtdNumerica = parseInt(quantidade);
+                    if (isNaN(qtdNumerica) || qtdNumerica <= 0) return console.log('Quantidade inválida.'), adicionarAoCarrinho();
+                    for (let i = 0; i < qtdNumerica; i++) carrinho.push(produto);
+                    console.log(`${qtdNumerica} ${produto.nome}(s) adicionado(s) ao carrinho.`);
+                    adicionarAoCarrinho();
+                });
             });
-        } else {
-            console.log('Produto não encontrado.');
-            menuAdmin();
-        }
+        };
+        adicionarAoCarrinho();
     });
 }
 
-function mudarPrecoProduto() {
-    rl.question('Nome do produto para mudar o preço: ', (nome) => {
-        const produto = produtos.find(p => p.nome === nome);
-        if (produto) {
-            rl.question('Novo preço: ', (preco) => {
-                const precoNumerico = parseFloat(preco);
-                if (isNaN(precoNumerico)) {
-                    console.log('Preço inválido. Tente novamente.');
-                    mudarPrecoProduto();
-                    return;
-                }
-                produto.preco = precoNumerico;
-                salvarDados();
-                console.log('Preço alterado com sucesso!');
-                menuAdmin();
-            });
-        } else {
-            console.log('Produto não encontrado.');
-            menuAdmin();
-        }
+function selecionarPagamento(carrinho, cliente) {
+    tratarErro(() => {
+        if (!cliente) return console.log('Cliente não autenticado.'), menu(null);
+        console.log('\nFormas de Pagamento:');
+        console.log('1. Dinheiro');
+        console.log('2. Cartão de Crédito');
+        console.log('3. Cartão de Débito');
+        console.log('4. Xerecard');
+        console.log('5. Boleto Bancário');
+        console.log('6. Fiado');
+        rl.question('Escolha uma forma de pagamento: ', escolha => {
+            const formasPagamento = {
+                '1': 'Dinheiro',
+                '2': () => {
+                    rl.question('Número de parcelas (1 a 12): ', parcelas => {
+                        const numParcelas = parseInt(parcelas);
+                        if (isNaN(numParcelas) || numParcelas < 1 || numParcelas > 12) {
+                            console.log('Número de parcelas inválido.');
+                            selecionarPagamento(carrinho, cliente);
+                        } else {
+                            const total = carrinho.reduce((acc, produto) => acc + produto.preco, 0);
+                            const valorParcela = numParcelas > 4 ? total * 1.02 / numParcelas : total / numParcelas; // 2% de juros a partir de 5 parcelas
+                            finalizarCompra(cliente, carrinho, `Cartão de Crédito - ${numParcelas} parcela(s) de R$${valorParcela.toFixed(2)}`);
+                        }
+                    });
+                },
+                '3': 'Cartão de Débito',
+                '4': () => {
+                    rl.question('Digite o dia do pagamento (DD/MM/AAAA): ', dia => {
+                        const data = new Date(dia);
+                        if (isNaN(data.getTime())) return console.log('Data inválida.'), selecionarPagamento(carrinho, cliente);
+                        finalizarCompra(cliente, carrinho, `Xerecard - Data de pagamento: ${data.toLocaleDateString()}`);
+                    });
+                },
+                '5': () => {
+                    rl.question('Digite o código de barras do boleto: ', codigo => {
+                        finalizarCompra(cliente, carrinho, `Boleto Bancário - Código: ${codigo}`);
+                    });
+                },
+                '6': 'Fiado'
+            };
+            if (formasPagamento[escolha]) {
+                typeof formasPagamento[escolha] === 'string' ? finalizarCompra(cliente, carrinho, formasPagamento[escolha]) : formasPagamento[escolha]();
+            } else {
+                console.log('Opção inválida.');
+                selecionarPagamento(carrinho, cliente);
+            }
+        });
     });
 }
 
-function totalVendasDia() {
-    const hoje = new Date().toLocaleDateString('pt-BR');
-    const total = historicoCompras.reduce((acc, linha) => {
-        const [data, valor] = linha.split(', ');
-        if (data.startsWith(hoje)) {
-            acc += parseFloat(valor);
-        }
-        return acc;
-    }, 0);
-    console.log(`Total de vendas do dia (${hoje}): R$${total.toFixed(2)}`);
-    menuAdmin();
+function finalizarCompra(cliente, carrinho, tipoPagamento) {
+    tratarErro(() => {
+        if (!cliente) return console.log('Cliente não autenticado.'), menu(null);
+        const total = carrinho.reduce((acc, produto) => acc + produto.preco, 0);
+        const data = new Date();
+        const dataFormatada = `${data.getDate()}/${data.getMonth() + 1}/${data.getFullYear()} ${data.getHours()}:${data.getMinutes().toString().padStart(2, '0')}`;
+        const produtosContagem = carrinho.reduce((acc, produto) => {
+            acc[produto.nome] = (acc[produto.nome] || 0) + 1;
+            return acc;
+        }, {});
+        const produtosComprados = Object.entries(produtosContagem)
+            .map(([nome, quantidade]) => `${quantidade} ${nome}(s)`)
+            .join(', ');
+        const compraDetalhes = `${dataFormatada}, ${total.toFixed(2)}, ${tipoPagamento}, CPF: ${cliente.cpf}`;
+        historicoCompras.push(compraDetalhes);
+        historicoCompras.push(produtosComprados);
+        salvarDados();
+        console.log('Compra finalizada!');
+        console.log('Nota Fiscal:');
+        console.log(`Cliente: ${cliente.nome}`);
+        console.log(`Total: R$${total.toFixed(2)}`);
+        console.log(`Produtos: ${produtosComprados}`);
+        menu(cliente);
+    });
 }
 
 function menuAdmin() {
-    console.log('\nMenu Administrativo:');
+    console.log('\n--- Menu Administrativo ---');
     console.log('1. Adicionar Produto');
     console.log('2. Adicionar Promoção');
     console.log('3. Mudar Preço do Item');
     console.log('4. Total de Vendas do Dia');
     console.log('5. Voltar ao Menu Principal');
-    rl.question('Escolha uma opção: ', (opcao) => {
-        switch (opcao) {
-            case '1':
-                adicionarProduto();
-                break;
-            case '2':
-                adicionarPromocao();
-                break;
-            case '3':
-                mudarPrecoProduto();
-                break;
-            case '4':
-                totalVendasDia();
-                break;
-            case '5':
-                menu(null);
-                break;
-            default:
-                console.log('Opção inválida.');
-                menuAdmin();
-                break;
-        }
+    rl.question('Escolha uma opção: ', opcao => {
+        const opcoesAdmin = {
+            '1': adicionarProduto,
+            '2': () => {
+                tratarErro(() => {
+                    rl.question('Nome do produto para adicionar promoção: ', nome => {
+                        const produto = produtos.find(p => p.nome === nome);
+                        if (!produto) return console.log('Produto não encontrado.'), menuAdmin();
+                        rl.question('Novo preço com promoção: ', preco => {
+                            const precoNumerico = parseFloat(preco);
+                            isNaN(precoNumerico) ? (console.log('Preço inválido.'), menuAdmin()) : (produto.preco = precoNumerico, salvarDados(), console.log('Promoção aplicada com sucesso!'), menuAdmin());
+                        });
+                    });
+                });
+            },
+            '3': alterarPrecoProduto,
+            '4': totalVendasDia,
+            '5': () => menu(null)
+        };
+        (opcoesAdmin[opcao] || (() => console.log('Opção inválida.'), menuAdmin()))();
     });
 }
 
 function menu(cliente) {
-    console.log('\nMenu:');
+    console.log('\n--- Menu Principal ---');
     console.log('1. Comprar Produtos');
-    console.log('2. Sair');
-    rl.question('Escolha uma opção: ', (opcao) => {
-        switch (opcao) {
-            case '1':
-                comprarProdutos(cliente);
-                break;
-            case '2':
-                rl.close();
-                break;
-            default:
-                console.log('Opção inválida.');
-                menu(cliente);
-                break;
-        }
+    console.log('2. Exibir Catálogo de Produtos');
+    console.log('3. Sair');
+    rl.question('Escolha uma opção: ', opcao => {
+        const opcoesCliente = {
+            '1': () => comprarProdutos(cliente),
+            '2': catalogoProdutos,
+            '3': () => (console.log('Obrigado pela visita!'), rl.close())
+        };
+        (opcoesCliente[opcao] || (() => console.log('Opção inválida.'), menu(cliente)))();
     });
-}
-
-function comprarProdutos(cliente) {
-    exibirProdutos();
-    const carrinho = [];
-    function adicionarAoCarrinho() {
-        rl.question('Escolha um produto (ou digite "sair" para finalizar): ', (opcao) => {
-            if (opcao.toLowerCase() === 'sair') {
-                selecionarPagamento(carrinho, cliente);
-                return;
-            }
-            const indice = parseInt(opcao) - 1;
-            const produto = produtos[indice];
-            if (produto) {
-                rl.question('Quantidade: ', (quantidade) => {
-                    const qtdNumerica = parseInt(quantidade);
-                    if (isNaN(qtdNumerica) || qtdNumerica <= 0) {
-                        console.log('Quantidade inválida. Tente novamente.');
-                        adicionarAoCarrinho();
-                        return;
-                    }
-                    for (let i = 0; i < qtdNumerica; i++) {
-                        carrinho.push(produto);
-                    }
-                    console.log(`${qtdNumerica} ${produto.nome}(s) adicionado(s) ao carrinho.`);
-                    adicionarAoCarrinho();
-                });
-            } else {
-                console.log('Produto não encontrado.');
-                adicionarAoCarrinho();
-            }
-        });
-    }
-    adicionarAoCarrinho();
-}
-
-function selecionarPagamento(carrinho, cliente) {
-    console.log('\nFormas de Pagamento:');
-    console.log('1. Dinheiro');
-    console.log('2. Cartão de Crédito');
-    console.log('3. Cartão de Débito');
-    console.log('4. Xerecard');
-    console.log('5. Boleto Bancário');
-    console.log('6. Fiado');
-    rl.question('Escolha uma forma de pagamento: ', (escolha) => {
-        switch (escolha) {
-            case '1':
-                finalizarCompra(cliente, carrinho, 'Dinheiro');
-                break;
-            case '2':
-                finalizarCompra(cliente, carrinho, 'Cartão de Crédito');
-                break;
-            case '3':
-                finalizarCompra(cliente, carrinho, 'Cartão de Débito');
-                break;
-            case '4':
-                rl.question('Digite o dia do pagamento (DD/MM/AAAA): ', (dia) => {
-                    rl.question('Digite a hora do pagamento (HH:MM): ', (hora) => {
-                        console.log('Endereço: Rua Dr. Creme, 666, Xique-Xique BA.');
-                        console.log('Referência: Na Frente do Cemitério de Xique-Xique.');
-                        finalizarCompra(cliente, carrinho, `Xerecard - ${dia} ${hora}`);
-                    });
-                });
-                break;
-            case '5':
-                rl.question('Digite o código do boleto: ', (codigo) => {
-                    console.log('O pagamento deve ser realizado no prazo de uma semana!');
-                    finalizarCompra(cliente, carrinho, `Boleto Bancário - Código: ${codigo}`);
-                });
-                break;
-            case '6':
-                console.log('O pagamento deve ser realizado no prazo de uma semana!');
-                rl.question('Qual o dia de pagamento? (DD/MM/AAAA): ', (dia) => {
-                    finalizarCompra(cliente, carrinho, `Fiado - Dia de Pagamento: ${dia}`);
-                });
-                break;
-            default:
-                console.log('Forma de pagamento inválida. Favor tente novamente.');
-                selecionarPagamento(carrinho, cliente);
-                break;
-        }
-    });
-}
-
-function finalizarCompra(cliente, carrinho, tipoPagamento) {
-    const total = carrinho.reduce((sum, produto) => sum + produto.preco, 0);
-
-    const produtosContagem = {};
-    carrinho.forEach(produto => {
-        produtosContagem[produto.nome] = (produtosContagem[produto.nome] || 0) + 1;
-    });
-
-    const produtosComprados = Object.entries(produtosContagem)
-        .map(([nome, quantidade]) => `${quantidade} ${nome}(s)`)
-        .join(', ');
-
-    const data = new Date();
-    const dataFormatada = `${data.getDate()}/${data.getMonth() + 1}/${data.getFullYear()} ${data.getHours()}:${data.getMinutes().toString().padStart(2, '0')}`;
-    const compraDetalhes = `${dataFormatada}, ${total.toFixed(2)}, ${tipoPagamento}`;
-
-    historicoCompras.push(compraDetalhes);
-    historicoCompras.push(produtosComprados);
-
-    salvarDados();
-
-    console.log('Compra finalizada!');
-    console.log('Nota Fiscal:');
-    console.log(`Cliente: ${cliente ? cliente.nome : 'Ghost'}`);
-    console.log(`Total: R$${total.toFixed(2)}`);
-    console.log(`Produtos: ${produtosComprados}`);
-
-    if (!cliente) {
-        console.log('Agradecemos pela compra, volte sempre!');
-        rl.close();
-    } else {
-        menu(cliente);
-    }
 }
 
 function iniciarSistema() {
-    perguntarSimNao('Já possui cadastro? (s/n): ', (resposta) => {
-        if (resposta === 's') {
-            loadingAnimation(() => {
-                loginCliente(cliente => {
-                    if (cliente.email === admin.email) {
-                        autenticarAdmin(menuAdmin);
-                    } else {
-                        menu(cliente);
-                    }
-                });
-            });
-        } else {
-            console.log('Bem-vindo à quitanda!');
-            perguntarSimNao('Deseja fazer o cadastro? (s/n): ', (respostaCadastro) => {
-                if (respostaCadastro === 's') {
-                    cadastrarCliente();
-                } else {
-                    rl.close();
-                }
-            });
-        }
+    tratarErro(() => {
+        perguntarSimNao('Já possui cadastro? (s/n): ', resposta => {
+            resposta === 's' ? loadingAnimation(() => loginCliente(cliente => cliente.email === admin.email ? autenticarAdmin(menuAdmin) : menu(cliente))) : (console.log('Bem-vindo à quitanda!'), perguntarSimNao('Deseja fazer o cadastro? (s/n): ', respostaCadastro => respostaCadastro === 's' ? cadastrarCliente() : rl.close()));
+        });
     });
 }
 
