@@ -61,8 +61,8 @@ function tratarErro(funcao) {
 
 function perguntarSimNao(pergunta, callback) {
     rl.question(pergunta, resposta => {
-        resposta.toLowerCase() === 's' || resposta.toLowerCase() === 'n'
-            ? callback(resposta.toLowerCase())
+        resposta.toLowerCase() === 's' || resposta.toLowerCase() === 'n' 
+            ? callback(resposta.toLowerCase()) 
             : (console.log('Resposta inválida. Responda com "s" ou "n".'), perguntarSimNao(pergunta, callback));
     });
 }
@@ -100,10 +100,10 @@ function validarEntrada(mensagem, regex, callback) {
 
 function cadastrarCliente() {
     tratarErro(() => {
-        validarEntrada('Nome (máx 50 caracteres): ', /^.{1,50}$/, nome => {
+        validarEntrada('Nome: ', /^.{1,50}$/, nome => {
             validarEntrada('Email/hotmail: ', /^[^\s@]+@[^\s@]+\.[^\s@]+$/, email => {
-                validarEntrada('Senha (máx 20 caracteres): ', /^.{1,20}$/, senha => {
-                    validarEntrada('CPF (somente números, 11 dígitos): ', /^\d{11}$/, cpf => {
+                validarEntrada('Senha: ', /^.{1,20}$/, senha => {
+                    validarEntrada('CPF (somente números): ', /^\d{11}$/, cpf => {
                         cadastros.push({ nome, email, senha, cpf });
                         salvarDados();
                         console.log('Cliente cadastrado com sucesso!');
@@ -165,36 +165,17 @@ function exibirProdutos() {
     produtos.forEach((produto, index) => console.log(`${index + 1}. ${produto.nome} - R$${produto.preco.toFixed(2)}`));
 }
 
-function catalogoProdutos() {
+function exibirCatalogo() {
     console.log('\nCatálogo de Produtos:');
     exibirProdutos();
-    menu(null); // Volta ao menu principal após exibir o catálogo
-}
-
-function comprarProdutos(cliente) {
-    tratarErro(() => {
-        if (!cliente) return console.log('Cliente não autenticado.'), menu(null);
-        exibirProdutos();
-        const carrinho = [];
-        const adicionarAoCarrinho = () => {
-            rl.question('Escolha um produto (ou digite "sair" para finalizar): ', opcao => {
-                if (opcao.toLowerCase() === 'sair') {
-                    selecionarPagamento(carrinho, cliente);
-                    return;
-                }
-                const indice = parseInt(opcao) - 1;
-                const produto = produtos[indice];
-                if (!produto) return console.log('Produto não encontrado.'), adicionarAoCarrinho();
-                rl.question('Quantidade: ', quantidade => {
-                    const qtdNumerica = parseInt(quantidade);
-                    if (isNaN(qtdNumerica) || qtdNumerica <= 0) return console.log('Quantidade inválida.'), adicionarAoCarrinho();
-                    for (let i = 0; i < qtdNumerica; i++) carrinho.push(produto);
-                    console.log(`${qtdNumerica} ${produto.nome}(s) adicionado(s) ao carrinho.`);
-                    adicionarAoCarrinho();
-                });
-            });
-        };
-        adicionarAoCarrinho();
+    console.log('1. Voltar ao Menu Principal');
+    rl.question('Escolha uma opção: ', opcao => {
+        if (opcao === '1') {
+            menu(null); // Volta ao menu principal
+        } else {
+            console.log('Opção inválida.');
+            exibirCatalogo(); // Repete a exibição do catálogo
+        }
     });
 }
 
@@ -214,14 +195,13 @@ function selecionarPagamento(carrinho, cliente) {
                 '2': () => {
                     rl.question('Número de parcelas (1 a 12): ', parcelas => {
                         const numParcelas = parseInt(parcelas);
-                        if (isNaN(numParcelas) || numParcelas < 1 || numParcelas > 12) {
-                            console.log('Número de parcelas inválido.');
-                            selecionarPagamento(carrinho, cliente);
-                        } else {
-                            const total = carrinho.reduce((acc, produto) => acc + produto.preco, 0);
-                            const valorParcela = numParcelas > 4 ? total * 1.02 / numParcelas : total / numParcelas; // 2% de juros a partir de 5 parcelas
-                            finalizarCompra(cliente, carrinho, `Cartão de Crédito - ${numParcelas} parcela(s) de R$${valorParcela.toFixed(2)}`);
-                        }
+                        if (isNaN(numParcelas) || numParcelas < 1 || numParcelas > 12) return console.log('Número de parcelas inválido.'), selecionarPagamento(carrinho, cliente);
+                        const juros = numParcelas > 4 ? 0.02 * (numParcelas - 4) : 0; // Juros de 2% por parcela além da 4ª
+                        const total = carrinho.reduce((acc, produto) => acc + produto.preco, 0);
+                        const valorParcela = total / numParcelas * (1 + juros);
+                        console.log(`Total com juros: R$${total.toFixed(2)}`);
+                        console.log(`Valor de cada parcela: R$${valorParcela.toFixed(2)}`);
+                        finalizarCompra(cliente, carrinho, `Cartão de Crédito - ${numParcelas} parcela(s)`);
                     });
                 },
                 '3': 'Cartão de Débito',
@@ -229,18 +209,19 @@ function selecionarPagamento(carrinho, cliente) {
                     rl.question('Digite o dia do pagamento (DD/MM/AAAA): ', dia => {
                         const data = new Date(dia);
                         if (isNaN(data.getTime())) return console.log('Data inválida.'), selecionarPagamento(carrinho, cliente);
-                        finalizarCompra(cliente, carrinho, `Xerecard - Data de pagamento: ${data.toLocaleDateString()}`);
+                        finalizarCompra(cliente, carrinho, `Xerecard - ${dia}`);
                     });
                 },
-                '5': () => {
-                    rl.question('Digite o código de barras do boleto: ', codigo => {
-                        finalizarCompra(cliente, carrinho, `Boleto Bancário - Código: ${codigo}`);
-                    });
-                },
+                '5': 'Boleto Bancário',
                 '6': 'Fiado'
             };
-            if (formasPagamento[escolha]) {
-                typeof formasPagamento[escolha] === 'string' ? finalizarCompra(cliente, carrinho, formasPagamento[escolha]) : formasPagamento[escolha]();
+
+            const pagamentoSelecionado = formasPagamento[escolha];
+            if (typeof pagamentoSelecionado === 'string') {
+                console.log(`Forma de pagamento selecionada: ${pagamentoSelecionado}`);
+                finalizarCompra(cliente, carrinho, pagamentoSelecionado);
+            } else if (typeof pagamentoSelecionado === 'function') {
+                pagamentoSelecionado();
             } else {
                 console.log('Opção inválida.');
                 selecionarPagamento(carrinho, cliente);
@@ -249,59 +230,14 @@ function selecionarPagamento(carrinho, cliente) {
     });
 }
 
-function finalizarCompra(cliente, carrinho, tipoPagamento) {
+function finalizarCompra(cliente, carrinho, formaPagamento) {
     tratarErro(() => {
-        if (!cliente) return console.log('Cliente não autenticado.'), menu(null);
         const total = carrinho.reduce((acc, produto) => acc + produto.preco, 0);
-        const data = new Date();
-        const dataFormatada = `${data.getDate()}/${data.getMonth() + 1}/${data.getFullYear()} ${data.getHours()}:${data.getMinutes().toString().padStart(2, '0')}`;
-        const produtosContagem = carrinho.reduce((acc, produto) => {
-            acc[produto.nome] = (acc[produto.nome] || 0) + 1;
-            return acc;
-        }, {});
-        const produtosComprados = Object.entries(produtosContagem)
-            .map(([nome, quantidade]) => `${quantidade} ${nome}(s)`)
-            .join(', ');
-        const compraDetalhes = `${dataFormatada}, ${total.toFixed(2)}, ${tipoPagamento}, CPF: ${cliente.cpf}`;
-        historicoCompras.push(compraDetalhes);
-        historicoCompras.push(produtosComprados);
+        const hoje = new Date().toLocaleDateString('pt-BR');
+        historicoCompras.push(`${hoje}, R$${total.toFixed(2)}, ${cliente.email}, ${formaPagamento}`);
         salvarDados();
-        console.log('Compra finalizada!');
-        console.log('Nota Fiscal:');
-        console.log(`Cliente: ${cliente.nome}`);
-        console.log(`Total: R$${total.toFixed(2)}`);
-        console.log(`Produtos: ${produtosComprados}`);
-        menu(cliente);
-    });
-}
-
-function menuAdmin() {
-    console.log('\n--- Menu Administrativo ---');
-    console.log('1. Adicionar Produto');
-    console.log('2. Adicionar Promoção');
-    console.log('3. Mudar Preço do Item');
-    console.log('4. Total de Vendas do Dia');
-    console.log('5. Voltar ao Menu Principal');
-    rl.question('Escolha uma opção: ', opcao => {
-        const opcoesAdmin = {
-            '1': adicionarProduto,
-            '2': () => {
-                tratarErro(() => {
-                    rl.question('Nome do produto para adicionar promoção: ', nome => {
-                        const produto = produtos.find(p => p.nome === nome);
-                        if (!produto) return console.log('Produto não encontrado.'), menuAdmin();
-                        rl.question('Novo preço com promoção: ', preco => {
-                            const precoNumerico = parseFloat(preco);
-                            isNaN(precoNumerico) ? (console.log('Preço inválido.'), menuAdmin()) : (produto.preco = precoNumerico, salvarDados(), console.log('Promoção aplicada com sucesso!'), menuAdmin());
-                        });
-                    });
-                });
-            },
-            '3': alterarPrecoProduto,
-            '4': totalVendasDia,
-            '5': () => menu(null)
-        };
-        (opcoesAdmin[opcao] || (() => console.log('Opção inválida.'), menuAdmin()))();
+        console.log('Compra finalizada com sucesso!');
+        menu(null);
     });
 }
 
@@ -311,22 +247,78 @@ function menu(cliente) {
     console.log('2. Exibir Catálogo de Produtos');
     console.log('3. Sair');
     rl.question('Escolha uma opção: ', opcao => {
-        const opcoesCliente = {
-            '1': () => comprarProdutos(cliente),
-            '2': catalogoProdutos,
-            '3': () => (console.log('Obrigado pela visita!'), rl.close())
-        };
-        (opcoesCliente[opcao] || (() => console.log('Opção inválida.'), menu(cliente)))();
+        switch (opcao) {
+            case '1':
+                tratarErro(() => {
+                    exibirProdutos();
+                    rl.question('Digite o nome ou número do produto para comprar: ', input => {
+                        const index = parseInt(input) - 1;
+                        if (!isNaN(index) && index >= 0 && index < produtos.length) {
+                            selecionarPagamento([produtos[index]], cliente);
+                        } else {
+                            const produto = produtos.find(p => p.nome.toLowerCase() === input.toLowerCase());
+                            if (!produto) return console.log('Produto não encontrado.'), menu(cliente);
+                            selecionarPagamento([produto], cliente);
+                        }
+                    });
+                });
+                break;
+            case '2':
+                exibirCatalogo();
+                break;
+            case '3':
+                console.log('Saindo...');
+                rl.close();
+                break;
+            default:
+                console.log('Opção inválida.');
+                menu(cliente);
+                break;
+        }
     });
 }
 
-function iniciarSistema() {
-    tratarErro(() => {
-        perguntarSimNao('Já possui cadastro? (s/n): ', resposta => {
-            resposta === 's' ? loadingAnimation(() => loginCliente(cliente => cliente.email === admin.email ? autenticarAdmin(menuAdmin) : menu(cliente))) : (console.log('Bem-vindo à quitanda!'), perguntarSimNao('Deseja fazer o cadastro? (s/n): ', respostaCadastro => respostaCadastro === 's' ? cadastrarCliente() : rl.close()));
-        });
+function menuAdmin() {
+    console.log('\n--- Menu do Administrador ---');
+    console.log('1. Adicionar Produto');
+    console.log('2. Alterar Preço de Produto');
+    console.log('3. Total de Vendas do Dia');
+    console.log('4. Sair');
+    rl.question('Escolha uma opção: ', opcao => {
+        switch (opcao) {
+            case '1':
+                adicionarProduto();
+                break;
+            case '2':
+                alterarPrecoProduto();
+                break;
+            case '3':
+                totalVendasDia();
+                break;
+            case '4':
+                console.log('Saindo...');
+                rl.close();
+                break;
+            default:
+                console.log('Opção inválida.');
+                menuAdmin();
+                break;
+        }
     });
 }
 
-carregarDados();
-iniciarSistema();
+function iniciar() {
+    carregarDados();
+    rl.question('Você já é um cliente cadastrado? (s/n): ', resposta => {
+        if (resposta.toLowerCase() === 's') {
+            loginCliente(cliente => menu(cliente));
+        } else if (resposta.toLowerCase() === 'n') {
+            cadastrarCliente();
+        } else {
+            console.log('Resposta inválida.');
+            iniciar();
+        }
+    });
+}
+
+iniciar();
